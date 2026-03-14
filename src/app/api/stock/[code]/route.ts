@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStockPrice, getStockDailyPrice } from "@/lib/kis-api";
+import { rateLimit } from "@/lib/cache";
 
 interface RouteContext {
   params: Promise<{ code: string }>;
 }
 
-export async function GET(_req: NextRequest, context: RouteContext) {
+export async function GET(req: NextRequest, context: RouteContext) {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
+  const allowed = await rateLimit(ip, "stock", 60, 60);
+  if (!allowed) {
+    return NextResponse.json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }, { status: 429 });
+  }
+
   const { code } = await context.params;
 
   if (!code || !/^\d{6}$/.test(code)) {
@@ -32,6 +39,6 @@ export async function GET(_req: NextRequest, context: RouteContext) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "종목 조회 실패";
     console.error(`[stock API] ${code}`, message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "종목 조회에 실패했습니다." }, { status: 500 });
   }
 }

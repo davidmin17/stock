@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRankings } from "@/lib/kis-api";
+import { rateLimit } from "@/lib/cache";
 import type { Category } from "@/lib/types";
 
 const VALID_CATEGORIES: Category[] = [
@@ -14,6 +15,12 @@ const VALID_CATEGORIES: Category[] = [
 ];
 
 export async function GET(req: NextRequest) {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
+  const allowed = await rateLimit(ip, "rankings", 60, 60);
+  if (!allowed) {
+    return NextResponse.json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }, { status: 429 });
+  }
+
   const { searchParams } = new URL(req.url);
   const category = searchParams.get("category") as Category | null;
 
@@ -37,6 +44,6 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "순위 조회 실패";
     console.error("[rankings API]", message);
-    return NextResponse.json({ stocks: [], error: message }, { status: 500 });
+    return NextResponse.json({ stocks: [], error: "순위 조회에 실패했습니다." }, { status: 500 });
   }
 }

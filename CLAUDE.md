@@ -21,7 +21,6 @@ src/
 │   ├── globals.css
 │   ├── stock/[code]/page.tsx       # 종목 상세 페이지 (가격 차트 + 일별 시세 테이블)
 │   └── api/
-│       ├── token/route.ts          # KIS 액세스 토큰 발급
 │       ├── rankings/route.ts       # 카테고리별 순위 조회
 │       ├── stock/[code]/route.ts   # 현재가 + 일별 시세
 │       └── realtime/route.ts       # WebSocket approval key 발급
@@ -36,7 +35,7 @@ src/
     ├── types.ts                    # TypeScript 타입 정의
     ├── kis-api.ts                  # KIS API 클라이언트 (모든 API에 withCache 적용)
     ├── kis-websocket.ts            # 브라우저용 WebSocket 클라이언트
-    ├── cache.ts                    # 3계층 캐시 유틸리티 (메모리 / single-flight / Redis)
+    ├── cache.ts                    # 3계층 캐시 유틸리티 (메모리 / single-flight / Redis) + IP 기반 rate limiting
     └── market.ts                   # 장 운영시간 판단 유틸리티 (isMarketOpen, formatKSTTime)
 ```
 
@@ -75,7 +74,16 @@ REDIS_URL=Redis_연결_URL   # 없으면 메모리 캐시만 사용
 - `GET /api/rankings?category={category}` — 카테고리별 순위
 - `GET /api/stock/{code}` — 종목 현재가 + 20일 일별 시세
 - `GET /api/realtime` — WebSocket approval key 발급
-- `POST /api/token` — KIS 액세스 토큰 발급
+
+모든 엔드포인트에 IP 기반 rate limiting이 적용된다 (Redis INCR 슬라이딩 윈도우).
+
+| 엔드포인트 | 한도 | 윈도우 |
+|-----------|------|--------|
+| `/api/rankings` | 60회 | 1분 |
+| `/api/stock/[code]` | 60회 | 1분 |
+| `/api/realtime` | 20회 | 1분 |
+
+Redis가 없으면 rate limiting은 fail-open(허용) 처리된다.
 
 ### 캐싱 전략
 
@@ -138,6 +146,9 @@ npm run lint    # ESLint 검사
 - 코스피+코스닥 전체 종목 대상 (`fid_input_iscd: "0000"`)
 - 카테고리별 TOP 20 표시 (`output.slice(0, 20)`)
 - KIS API 초당 요청 제한이 있으므로 캐싱 필수 유지
+- API 에러 응답에는 내부 상세 메시지를 포함하지 않는다. 상세 내용은 `console.error`로만 서버 로그에 남긴다
+- `/api/token` 엔드포인트는 보안상 제거됨. KIS 액세스 토큰은 서버 내부에서만 사용한다
+- Redis 클라이언트는 `lazyConnect` 없이 생성하며 `enableOfflineQueue`도 기본값(true)을 사용한다. Vercel 서버리스 cold start 시 커맨드가 큐에서 대기 후 정상 실행되도록 하기 위함
 - `MarketStatus.tsx`는 `new Date()` 기반으로 SSR/CSR hydration 불일치가 발생할 수 있어 초기 상태를 `null`로 두고 `useEffect`에서만 설정한다
 - `PriceChart.tsx`는 `"use client"` 컴포넌트이며 `dailyPrices`를 역순(오래된→최신)으로 정렬해서 렌더링한다
 - L1 메모리 캐시와 single-flight Map은 `globalThis`에 저장한다. 모듈 레벨 변수로 선언하면 Next.js Hot Reload 시 재평가되어 캐시가 초기화되므로 주의

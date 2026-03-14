@@ -115,6 +115,33 @@ export async function cacheSet<T>(
 }
 
 // ---------------------------------------------------------------------------
+// Rate limiting: Redis INCR 기반 슬라이딩 윈도우
+// ---------------------------------------------------------------------------
+
+/**
+ * IP + 엔드포인트 조합으로 요청 횟수를 제한한다.
+ * Redis가 없거나 오류 시 허용(fail-open) 처리한다.
+ * @returns true = 허용, false = 한도 초과
+ */
+export async function rateLimit(
+  ip: string,
+  endpoint: string,
+  limit: number,
+  windowSec: number
+): Promise<boolean> {
+  const redis = getRedis();
+  if (!redis) return true;
+  try {
+    const key = `rl:${endpoint}:${ip}`;
+    const count = await redis.incr(key);
+    if (count === 1) await redis.expire(key, windowSec);
+    return count <= limit;
+  } catch {
+    return true;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // withCache: L1 → dedupe → L2 → fn 순서로 조회하는 통합 헬퍼
 // ---------------------------------------------------------------------------
 
