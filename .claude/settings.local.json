@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)",
+      "Bash(curl:*)",
+      "WebFetch(domain:apiportal.koreainvestment.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:kissdevs.koreainvestment.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(sleep:*)"
+    ]
+  }
+}
