@@ -73,7 +73,13 @@ function getRedis(): Redis | null {
   if (!process.env.REDIS_URL) return null;
   if (redisClient) return redisClient;
 
-  redisClient = new Redis(process.env.REDIS_URL, {
+  const u = new URL(process.env.REDIS_URL);
+  redisClient = new Redis({
+    host: u.hostname,
+    port: u.port ? parseInt(u.port, 10) : 6379,
+    username: u.username || undefined,
+    password: u.password || undefined,
+    tls: u.protocol === "rediss:" ? {} : undefined,
     lazyConnect: true,
     maxRetriesPerRequest: 1,
     enableOfflineQueue: false,

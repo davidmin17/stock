@@ -9,7 +9,14 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:kissdevs.koreainvestment.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(sleep:*)"
+      "Bash(sleep:*)",
+      "Bash(npx:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(GIT_TERMINAL_PROMPT=0 git commit --no-gpg-sign -m \"upgrade ESLint 8 to 9 with flat config\" 2>&1; echo \"exit: $?\")",
+      "Bash(git push:*)",
+      "Bash(npm list:*)",
+      "Bash(git config:*)"
     ]
   }
 }
