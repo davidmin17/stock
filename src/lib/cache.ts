@@ -21,9 +21,7 @@ interface MemEntry {
 
 // globalThis에 저장해 Next.js Hot Reload 및 모듈 재평가 시에도 캐시가 유지되도록 한다.
 declare global {
-  // eslint-disable-next-line no-var
   var __memStore: Map<string, MemEntry> | undefined;
-  // eslint-disable-next-line no-var
   var __inflight: Map<string, Promise<unknown>> | undefined;
 }
 
