@@ -83,9 +83,9 @@ function getRedis(): Redis | null {
     enableOfflineQueue: false,
   });
 
-  redisClient.on("error", () => {
-    redisClient = null;
-  });
+  // 에러 이벤트를 처리하지 않으면 Node.js가 크래시하므로 핸들러는 유지.
+  // ioredis가 재연결을 자체적으로 처리하므로 클라이언트를 null로 초기화하지 않는다.
+  redisClient.on("error", () => {});
 
   return redisClient;
 }
