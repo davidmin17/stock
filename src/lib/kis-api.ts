@@ -1,4 +1,4 @@
-import { withCache } from "./cache";
+import { withCache, memGet, memSet, dedupe, cacheGet, cacheSet } from "./cache";
 import { isMarketOpen } from "./market";
 import type {
   Category,
@@ -15,8 +15,7 @@ import type {
 /** 장 운영 중엔 짧게, 장 마감 후엔 길게 */
 function rankingTTL() { return isMarketOpen() ? 60 : 300; }
 function priceTTL()   { return isMarketOpen() ? 30 : 300; }
-const DAILY_TTL  = 300; // 일별 시세는 EOD 데이터라 5분 고정
-const TOKEN_TTL  = 82800; // 23시간
+const DAILY_TTL = 300; // 일별 시세는 EOD 데이터라 5분 고정
 
 const BASE_URL = "https://openapi.koreainvestment.com:9443";
 
@@ -28,7 +27,22 @@ const APP_SECRET = process.env.KIS_APP_SECRET ?? "";
 // ---------------------------------------------------------------------------
 
 export async function getAccessToken(): Promise<string> {
-  return withCache("kis:access_token", TOKEN_TTL, async () => {
+  const CACHE_KEY = "kis:access_token";
+
+  // L1: 메모리 (Hot Reload·콜드 스타트 대응으로 globalThis에 저장됨)
+  const inMem = memGet<string>(CACHE_KEY);
+  if (inMem) return inMem;
+
+  // 동시 요청 중복 방지
+  return dedupe(CACHE_KEY, async () => {
+    // L2: Redis (인스턴스 간 공유)
+    const inKV = await cacheGet<string>(CACHE_KEY);
+    if (inKV) {
+      memSet(CACHE_KEY, inKV, 82800);
+      return inKV;
+    }
+
+    // 실제 발급
     const res = await fetch(`${BASE_URL}/oauth2/tokenP`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -43,6 +57,12 @@ export async function getAccessToken(): Promise<string> {
     if (!res.ok) throw new Error(`토큰 발급 실패: ${res.status}`);
 
     const data: AccessTokenResponse = await res.json();
+
+    // 실제 만료 시간에서 1시간 마진을 뺀 TTL 사용 (기본 23시간)
+    const ttl = Math.max((data.expires_in ?? 86400) - 3600, 3600);
+    memSet(CACHE_KEY, data.access_token, ttl);
+    await cacheSet(CACHE_KEY, data.access_token, ttl);
+
     return data.access_token;
   });
 }

@@ -19,7 +19,16 @@ interface MemEntry {
   expiresAt: number;
 }
 
-const memStore = new Map<string, MemEntry>();
+// globalThis에 저장해 Next.js Hot Reload 및 모듈 재평가 시에도 캐시가 유지되도록 한다.
+declare global {
+  // eslint-disable-next-line no-var
+  var __memStore: Map<string, MemEntry> | undefined;
+  // eslint-disable-next-line no-var
+  var __inflight: Map<string, Promise<unknown>> | undefined;
+}
+
+const memStore: Map<string, MemEntry> =
+  globalThis.__memStore ?? (globalThis.__memStore = new Map());
 
 export function memGet<T>(key: string): T | null {
   const e = memStore.get(key);
@@ -42,7 +51,8 @@ export function memSet<T>(key: string, value: T, ttlSec: number): void {
 // Single-flight: 동일 키에 대한 중복 요청 방지 (thundering herd 방어)
 // ---------------------------------------------------------------------------
 
-const inflight = new Map<string, Promise<unknown>>();
+const inflight: Map<string, Promise<unknown>> =
+  globalThis.__inflight ?? (globalThis.__inflight = new Map());
 
 export function dedupe<T>(key: string, fn: () => Promise<T>): Promise<T> {
   const existing = inflight.get(key) as Promise<T> | undefined;

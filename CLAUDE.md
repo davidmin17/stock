@@ -79,19 +79,21 @@ REDIS_URL=Redis_연결_URL   # 없으면 메모리 캐시만 사용
 
 ### 캐싱 전략
 
-`withCache(key, ttl, fn)` 헬퍼가 아래 순서로 조회한다:
+`withCache(key, ttl, fn)` 헬퍼가 아래 순서로 조회한다 (토큰은 직접 구현):
 
-1. **L1 메모리** (`Map<string, {value, expiresAt}>`) — 네트워크 I/O 없음, 가장 빠름
-2. **Single-flight** (`inflight` Promise 맵) — 캐시 미스 시 동시 요청 N개가 KIS API를 1회만 호출 (thundering herd 방어)
+1. **L1 메모리** (`globalThis.__memStore`) — 네트워크 I/O 없음, 가장 빠름. `globalThis`에 저장해 Next.js Hot Reload·모듈 재평가 후에도 캐시 유지
+2. **Single-flight** (`globalThis.__inflight` Promise 맵) — 캐시 미스 시 동시 요청 N개가 KIS API를 1회만 호출 (thundering herd 방어)
 3. **L2 Redis** (ioredis, `REDIS_URL`) — 인스턴스 간 공유, 없으면 스킵
 4. **KIS API 실제 호출** — 결과를 L1·L2에 함께 저장
 
 | 데이터 | 장 운영 중 TTL | 장 마감 후 TTL | 캐시 키 |
 |--------|--------------|--------------|--------|
-| 액세스 토큰 | 23시간 | 23시간 | `kis:access_token` |
+| 액세스 토큰 | `expires_in - 1시간` (기본 ~23시간) | 동일 | `kis:access_token` |
 | 순위 데이터 | 60초 | 5분 | `kis:rankings:{category}` |
 | 종목 현재가 | 30초 | 5분 | `kis:price:{code}` |
 | 일별 시세 | 5분 | 5분 | `kis:daily:{code}` |
+
+> 토큰 TTL은 KIS API 응답의 `expires_in` 값에서 1시간을 뺀 값을 사용한다. 하드코딩하지 않으므로 KIS 정책 변경에도 자동 대응된다.
 
 ### 종목 상세 페이지
 - **종가 차트** (`PriceChart.tsx`): 순수 SVG, 외부 라이브러리 없음
@@ -138,3 +140,5 @@ npm run lint    # ESLint 검사
 - KIS API 초당 요청 제한이 있으므로 캐싱 필수 유지
 - `MarketStatus.tsx`는 `new Date()` 기반으로 SSR/CSR hydration 불일치가 발생할 수 있어 초기 상태를 `null`로 두고 `useEffect`에서만 설정한다
 - `PriceChart.tsx`는 `"use client"` 컴포넌트이며 `dailyPrices`를 역순(오래된→최신)으로 정렬해서 렌더링한다
+- L1 메모리 캐시와 single-flight Map은 `globalThis`에 저장한다. 모듈 레벨 변수로 선언하면 Next.js Hot Reload 시 재평가되어 캐시가 초기화되므로 주의
+- ESLint 9 flat config (`eslint.config.mjs`) 사용. `.eslintrc.*` 형식은 사용하지 않는다
