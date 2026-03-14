@@ -78,9 +78,7 @@ function getRedis(): Redis | null {
     username: u.username || undefined,
     password: u.password || undefined,
     tls: u.protocol === "rediss:" ? {} : undefined,
-    lazyConnect: true,
     maxRetriesPerRequest: 1,
-    enableOfflineQueue: false,
   });
 
   // 에러 이벤트를 처리하지 않으면 Node.js가 크래시하므로 핸들러는 유지.
