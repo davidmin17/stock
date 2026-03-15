@@ -2,31 +2,17 @@
 
 import Link from "next/link";
 import type { StockRanking } from "@/lib/types";
+import { formatNumber, formatVolume, getChangeColor, getChangeSign } from "@/lib/formatters";
 
 interface StockRowProps {
   stock: StockRanking;
   showNetBuy?: boolean;
+  netBuyLabel?: string;
 }
 
-function formatNumber(n: number): string {
-  return n.toLocaleString("ko-KR");
-}
-
-function formatVolume(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toString();
-}
-
-export default function StockRow({ stock, showNetBuy = false }: StockRowProps) {
-  const isRise = stock.changeRate > 0;
-  const isFall = stock.changeRate < 0;
-  const changeColor = isRise
-    ? "text-rise"
-    : isFall
-    ? "text-fall"
-    : "text-text-secondary";
-  const changeSign = isRise ? "+" : "";
+export default function StockRow({ stock, showNetBuy = false, netBuyLabel = "순매수" }: StockRowProps) {
+  const changeColor = getChangeColor(stock.changeRate);
+  const changeSign = getChangeSign(stock.changeRate);
 
   return (
     <Link
@@ -69,11 +55,11 @@ export default function StockRow({ stock, showNetBuy = false }: StockRowProps) {
       <div className="text-right w-20 hidden sm:block">
         {showNetBuy && stock.netBuyVolume !== undefined ? (
           <>
-            <p className={`text-sm font-medium ${stock.netBuyVolume >= 0 ? "text-rise" : "text-fall"}`}>
-              {stock.netBuyVolume >= 0 ? "+" : ""}
+            <p className={`text-sm font-medium ${netBuyLabel.startsWith("순매도") ? "text-fall" : "text-rise"}`}>
+              {netBuyLabel.startsWith("순매수") && "+"}
               {formatVolume(stock.netBuyVolume)}
             </p>
-            <p className="text-text-muted text-xs">순매수</p>
+            <p className="text-text-muted text-xs">{netBuyLabel}</p>
           </>
         ) : (
           <>

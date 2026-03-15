@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStockPrice, getStockDailyPrice } from "@/lib/kis-api";
-import { rateLimit } from "@/lib/cache";
+import { rateLimit, getClientIP } from "@/lib/cache";
 
 interface RouteContext {
   params: Promise<{ code: string }>;
 }
 
 export async function GET(req: NextRequest, context: RouteContext) {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
+  const ip = getClientIP(req);
   const allowed = await rateLimit(ip, "stock", 60, 60);
   if (!allowed) {
     return NextResponse.json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }, { status: 429 });

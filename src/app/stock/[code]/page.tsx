@@ -4,6 +4,7 @@ import { getStockPrice, getStockDailyPrice } from "@/lib/kis-api";
 import RealtimePrice from "@/components/RealtimePrice";
 import PriceChart from "@/components/PriceChart";
 import type { Metadata } from "next";
+import { formatNumber, formatVolume, getChangeColor, getChangeSign } from "@/lib/formatters";
 
 interface PageProps {
   params: Promise<{ code: string }>;
@@ -16,19 +17,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-function formatNumber(n: number): string {
-  return n.toLocaleString("ko-KR");
-}
-
 function formatDate(d: string): string {
   if (d.length !== 8) return d;
   return `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6, 8)}`;
-}
-
-function formatVolume(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toString();
 }
 
 export default async function StockDetailPage({ params }: PageProps) {
@@ -52,11 +43,7 @@ export default async function StockDetailPage({ params }: PageProps) {
 
   const isRise = detail.changeRate > 0;
   const isFall = detail.changeRate < 0;
-  const badgeClass = isRise
-    ? "bg-rise/10 text-rise"
-    : isFall
-    ? "bg-fall/10 text-fall"
-    : "bg-border text-text-secondary";
+  const badgeClass = isRise ? "bg-rise/10 text-rise" : isFall ? "bg-fall/10 text-fall" : "bg-border text-text-secondary";
 
   return (
     <div className="space-y-6">
@@ -150,14 +137,8 @@ export default async function StockDetailPage({ params }: PageProps) {
             </thead>
             <tbody>
               {dailyPrices.map((row) => {
-                const rateRise = row.changeRate > 0;
-                const rateFall = row.changeRate < 0;
-                const rateColor = rateRise
-                  ? "text-rise"
-                  : rateFall
-                  ? "text-fall"
-                  : "text-text-secondary";
-                const sign = rateRise ? "+" : "";
+                const rateColor = getChangeColor(row.changeRate);
+                const sign = getChangeSign(row.changeRate);
                 return (
                   <tr
                     key={row.date}

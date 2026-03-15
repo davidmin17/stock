@@ -115,15 +115,22 @@ export class KISWebSocket {
     const handler = this.handlers.get(code);
     if (!handler) return;
 
+    const price = parseFloat(fields[2]);
+    const volume = parseFloat(fields[12]);
+
+    // 비정상 값 방어 (가격 0~10,000,000원, 거래량 0 이상)
+    if (!isFinite(price) || price < 0 || price > 10_000_000) return;
+    if (!isFinite(volume) || volume < 0) return;
+
     const data: RealtimeStockData = {
       code,
       time: fields[1] ?? "",
-      price: parseFloat(fields[2]) || 0,
+      price,
       changePrice: parseFloat(fields[4]) || 0,
       changeRate: parseFloat(fields[5]) || 0,
       high: parseFloat(fields[8]) || 0,
       low: parseFloat(fields[9]) || 0,
-      volume: parseFloat(fields[12]) || 0,
+      volume,
     };
 
     handler(data);

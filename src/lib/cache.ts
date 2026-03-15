@@ -115,12 +115,49 @@ export async function cacheSet<T>(
 }
 
 // ---------------------------------------------------------------------------
-// Rate limiting: Redis INCR 기반 슬라이딩 윈도우
+// 클라이언트 IP 추출
 // ---------------------------------------------------------------------------
+
+import type { NextRequest } from "next/server";
+
+/**
+ * 클라이언트 IP를 추출한다.
+ * Vercel / 신뢰할 수 있는 프록시 환경에서는 x-forwarded-for의 첫 번째 값이 실제 클라이언트 IP이다.
+ * x-real-ip를 우선 사용하고, 없으면 x-forwarded-for의 첫 번째 IP를 사용한다.
+ */
+export function getClientIP(req: NextRequest): string {
+  return (
+    req.headers.get("x-real-ip") ??
+    req.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
+    "unknown"
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Rate limiting: Redis INCR 기반 슬라이딩 윈도우 (메모리 폴백 포함)
+// ---------------------------------------------------------------------------
+
+/** Redis 없이 동작하는 메모리 기반 rate limiter (단일 인스턴스 전용) */
+declare global {
+  var __rlStore: Map<string, { count: number; expiresAt: number }> | undefined;
+}
+const rlStore: Map<string, { count: number; expiresAt: number }> =
+  globalThis.__rlStore ?? (globalThis.__rlStore = new Map());
+
+function localRateLimit(key: string, limit: number, windowSec: number): boolean {
+  const now = Date.now();
+  const entry = rlStore.get(key);
+  if (!entry || now > entry.expiresAt) {
+    rlStore.set(key, { count: 1, expiresAt: now + windowSec * 1000 });
+    return true;
+  }
+  entry.count += 1;
+  return entry.count <= limit;
+}
 
 /**
  * IP + 엔드포인트 조합으로 요청 횟수를 제한한다.
- * Redis가 없거나 오류 시 허용(fail-open) 처리한다.
+ * Redis가 없거나 오류 시 메모리 기반 rate limiting으로 폴백한다.
  * @returns true = 허용, false = 한도 초과
  */
 export async function rateLimit(
@@ -129,15 +166,16 @@ export async function rateLimit(
   limit: number,
   windowSec: number
 ): Promise<boolean> {
+  const key = `rl:${endpoint}:${ip}`;
   const redis = getRedis();
-  if (!redis) return true;
+  if (!redis) return localRateLimit(key, limit, windowSec);
   try {
-    const key = `rl:${endpoint}:${ip}`;
     const count = await redis.incr(key);
     if (count === 1) await redis.expire(key, windowSec);
     return count <= limit;
   } catch {
-    return true;
+    // Redis 오류 시 메모리 폴백 (fail-open 대신 로컬 제한 유지)
+    return localRateLimit(key, limit, windowSec);
   }
 }
 
@@ -152,21 +190,27 @@ export async function withCache<T>(
 ): Promise<T> {
   // L1: 메모리 캐시 (I/O 없음, 가장 빠름)
   const inMem = memGet<T>(key);
-  if (inMem !== null) return inMem;
+  const memEmpty = Array.isArray(inMem) && inMem.length === 0;
+  if (inMem !== null && !memEmpty) return inMem;
 
   // 동시에 들어온 동일 키 요청은 하나의 Promise로 수렴
   return dedupe(key, async () => {
     // L2: Redis KV (인스턴스 간 공유)
     const inKV = await cacheGet<T>(key);
-    if (inKV !== null) {
+    const kvEmpty = Array.isArray(inKV) && inKV.length === 0;
+    if (inKV !== null && !kvEmpty) {
       memSet(key, inKV, ttlSec); // KV 결과를 메모리에도 올려둠
       return inKV;
     }
 
     // L3: 실제 KIS API 호출
     const fresh = await fn();
-    memSet(key, fresh, ttlSec);
-    await cacheSet(key, fresh, ttlSec);
+    // 빈 배열은 캐싱하지 않음 (에러 응답으로 인한 빈 결과가 캐시에 고착되는 것 방지)
+    const isEmpty = Array.isArray(fresh) && fresh.length === 0;
+    if (!isEmpty) {
+      memSet(key, fresh, ttlSec);
+      await cacheSet(key, fresh, ttlSec);
+    }
     return fresh;
   });
 }

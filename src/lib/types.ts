@@ -43,6 +43,13 @@ export interface DailyPrice {
   changeRate: number;
 }
 
+export interface IndexPrice {
+  name: string;
+  value: number;
+  changeRate: number;
+  changePrice: number;
+}
+
 export interface AccessTokenResponse {
   access_token: string;
   token_type: string;

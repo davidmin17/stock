@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import type { DailyPrice } from "@/lib/types";
+import { formatNumber } from "@/lib/formatters";
 
 interface PriceChartProps {
   dailyPrices: DailyPrice[];
@@ -10,10 +11,6 @@ interface PriceChartProps {
 function formatDate(d: string): string {
   if (d.length !== 8) return d;
   return `${d.slice(4, 6)}.${d.slice(6, 8)}`;
-}
-
-function formatNumber(n: number): string {
-  return n.toLocaleString("ko-KR");
 }
 
 function abbreviate(n: number): string {
@@ -26,8 +23,8 @@ function abbreviate(n: number): string {
 export default function PriceChart({ dailyPrices }: PriceChartProps) {
   const [hovered, setHovered] = useState<number | null>(null);
 
-  // 오래된 날짜 → 최신 순으로 정렬 (API는 최신순)
-  const data = [...dailyPrices].reverse();
+  // 오래된 날짜 → 최신 순으로 정렬 (API는 최신순), props 변경 시에만 재계산
+  const data = useMemo(() => [...dailyPrices].reverse(), [dailyPrices]);
 
   if (data.length < 2) return null;
 

@@ -5,6 +5,7 @@ import useSWR from "swr";
 import CategoryTabs from "@/components/CategoryTabs";
 import RankingTable from "@/components/RankingTable";
 import MarketStatus from "@/components/MarketStatus";
+import IndexBadges from "@/components/IndexBadges";
 import type { Category, StockRanking } from "@/lib/types";
 
 const fetcher = (url: string) =>
@@ -35,7 +36,10 @@ export default function HomePage() {
             실시간 시세 기준 · 30초마다 자동 갱신
           </p>
         </div>
-        <MarketStatus />
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <IndexBadges />
+          <MarketStatus />
+        </div>
       </div>
 
       {/* 카테고리 탭 */}

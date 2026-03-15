@@ -17,6 +17,8 @@ const NET_BUY_CATEGORIES: Category[] = [
   "institutionSell",
 ];
 
+const NET_SELL_CATEGORIES: Category[] = ["foreignSell", "institutionSell"];
+
 export default function RankingTable({
   stocks,
   category,
@@ -24,6 +26,8 @@ export default function RankingTable({
   error,
 }: RankingTableProps) {
   const showNetBuy = NET_BUY_CATEGORIES.includes(category);
+  const isSell = NET_SELL_CATEGORIES.includes(category);
+  const netBuyLabel = isSell ? "순매도 수량" : "순매수 수량";
 
   if (isLoading) {
     return (
@@ -35,7 +39,7 @@ export default function RankingTable({
           <span className="w-24 text-right text-xs text-text-muted">현재가</span>
           <span className="w-16 text-right text-xs text-text-muted">등락률</span>
           <span className="w-20 text-right text-xs text-text-muted hidden sm:block">
-            {showNetBuy ? "순매수" : "거래량"}
+            {showNetBuy ? netBuyLabel : "거래량"}
           </span>
         </div>
         {Array.from({ length: 10 }).map((_, i) => (
@@ -90,11 +94,11 @@ export default function RankingTable({
         <span className="w-24 text-right text-xs text-text-muted">현재가</span>
         <span className="w-16 text-right text-xs text-text-muted">등락률</span>
         <span className="w-20 text-right text-xs text-text-muted hidden sm:block">
-          {showNetBuy ? "순매수" : "거래량"}
+          {showNetBuy ? netBuyLabel : "거래량"}
         </span>
       </div>
       {stocks.map((stock) => (
-        <StockRow key={stock.code} stock={stock} showNetBuy={showNetBuy} />
+        <StockRow key={stock.code} stock={stock} showNetBuy={showNetBuy} netBuyLabel={netBuyLabel} />
       ))}
     </div>
   );

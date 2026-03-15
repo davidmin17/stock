@@ -3,16 +3,13 @@
 import { useState, useEffect, useRef } from "react";
 import { KISWebSocket, type RealtimeStockData } from "@/lib/kis-websocket";
 import { isMarketOpen } from "@/lib/market";
+import { formatNumber, getChangeColor, getChangeSign } from "@/lib/formatters";
 
 interface RealtimePriceProps {
   code: string;
   initialPrice: number;
   initialChangeRate: number;
   initialChangePrice: number;
-}
-
-function formatNumber(n: number): string {
-  return n.toLocaleString("ko-KR");
 }
 
 export default function RealtimePrice({
@@ -62,10 +59,8 @@ export default function RealtimePrice({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
 
-  const isRise = changeRate > 0;
-  const isFall = changeRate < 0;
-  const changeColor = isRise ? "text-rise" : isFall ? "text-fall" : "text-text-secondary";
-  const changeSign = isRise ? "+" : "";
+  const changeColor = getChangeColor(changeRate);
+  const changeSign = getChangeSign(changeRate);
 
   const flashClass =
     flash === "up"

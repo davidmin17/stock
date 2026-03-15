@@ -2,6 +2,7 @@ import { withCache, memGet, memSet, dedupe, cacheGet, cacheSet } from "./cache";
 import { isMarketOpen } from "./market";
 import type {
   Category,
+  IndexPrice,
   StockRanking,
   StockDetail,
   DailyPrice,
@@ -116,8 +117,10 @@ async function kisGet<T>(
   });
 
   if (!res.ok) {
+    // 상세 응답 내용은 서버 로그에만 기록 (클라이언트에 노출 금지)
     const body = await res.text().catch(() => "");
-    throw new Error(`KIS API 오류 [${trId}]: ${res.status} ${body}`);
+    console.error(`[KIS API] trId=${trId} status=${res.status} body=${body}`);
+    throw new Error(`KIS API 오류 [${trId}]: ${res.status}`);
   }
 
   return res.json() as Promise<T>;
@@ -259,6 +262,7 @@ async function getForeignRanking(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const output: any[] = data?.output ?? [];
+  const isSell = sortCode === "1";
   return output.slice(0, 20).map((item, idx) => ({
     rank: idx + 1,
     code: item.mksc_shrn_iscd ?? "",
@@ -267,7 +271,9 @@ async function getForeignRanking(
     changeRate: parseNumber(item.prdy_ctrt),
     changePrice: parseNumber(item.prdy_vrss),
     volume: parseNumber(item.acml_vol),
-    netBuyVolume: parseNumber(item.frgn_ntby_tr_pbmn),
+    netBuyVolume: isSell
+      ? -parseNumber(item.frgn_ntby_qty)
+      : parseNumber(item.frgn_ntby_qty),
   }));
 }
 
@@ -291,6 +297,7 @@ async function getInstitutionRanking(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const output: any[] = data?.output ?? [];
+  const isSell = sortCode === "1";
   return output.slice(0, 20).map((item, idx) => ({
     rank: idx + 1,
     code: item.mksc_shrn_iscd ?? "",
@@ -299,8 +306,36 @@ async function getInstitutionRanking(
     changeRate: parseNumber(item.prdy_ctrt),
     changePrice: parseNumber(item.prdy_vrss),
     volume: parseNumber(item.acml_vol),
-    netBuyVolume: parseNumber(item.orgn_ntby_tr_pbmn),
+    netBuyVolume: isSell
+      ? -parseNumber(item.orgn_ntby_qty)
+      : parseNumber(item.orgn_ntby_qty),
   }));
+}
+
+// ---------------------------------------------------------------------------
+// 지수 조회 (코스피 / 코스닥)
+// ---------------------------------------------------------------------------
+
+async function fetchIndex(iscd: string): Promise<IndexPrice> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = await kisGet<any>(
+    "/uapi/domestic-stock/v1/quotations/inquire-index-price",
+    "FHPUP02100000",
+    { fid_cond_mrkt_div_code: "U", fid_input_iscd: iscd }
+  );
+  const o = data?.output ?? {};
+  return {
+    name: iscd === "0001" ? "KOSPI" : "KOSDAQ",
+    value: parseNumber(o.bstp_nmix_prpr),
+    changeRate: parseNumber(o.bstp_nmix_prdy_ctrt),
+    changePrice: parseNumber(o.bstp_nmix_prdy_vrss),
+  };
+}
+
+export async function getIndices(): Promise<IndexPrice[]> {
+  return withCache("kis:indices", isMarketOpen() ? 30 : 300, () =>
+    Promise.all([fetchIndex("0001"), fetchIndex("1001")])
+  );
 }
 
 export async function getRankings(

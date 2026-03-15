@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getWebSocketApprovalKey } from "@/lib/kis-api";
-import { rateLimit } from "@/lib/cache";
+import { rateLimit, getClientIP } from "@/lib/cache";
 
 /**
  * WebSocket approval key를 클라이언트에 제공하는 엔드포인트
@@ -10,7 +10,7 @@ import { rateLimit } from "@/lib/cache";
  * APP_KEY / APP_SECRET은 절대 클라이언트에 노출되지 않습니다.
  */
 export async function GET(req: NextRequest) {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
+  const ip = getClientIP(req);
   const allowed = await rateLimit(ip, "realtime", 20, 60);
   if (!allowed) {
     return NextResponse.json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }, { status: 429 });
