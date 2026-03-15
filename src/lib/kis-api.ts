@@ -251,7 +251,7 @@ async function getForeignRanking(
       fid_cond_mrkt_div_code: "V",
       fid_cond_scr_div_code: "16449",
       fid_input_iscd: "0000",
-      fid_div_cls_code: "0",
+      fid_div_cls_code: "1",
       fid_rank_sort_cls_code: sortCode,
       fid_etc_cls_code: "1",
     }
@@ -267,7 +267,7 @@ async function getForeignRanking(
     changeRate: parseNumber(item.prdy_ctrt),
     changePrice: parseNumber(item.prdy_vrss),
     volume: parseNumber(item.acml_vol),
-    netBuyVolume: parseNumber(item.frgn_ntby_qty),
+    netBuyVolume: parseNumber(item.frgn_ntby_tr_pbmn),
   }));
 }
 
@@ -283,7 +283,7 @@ async function getInstitutionRanking(
       fid_cond_mrkt_div_code: "V",
       fid_cond_scr_div_code: "16449",
       fid_input_iscd: "0000",
-      fid_div_cls_code: "0",
+      fid_div_cls_code: "1",
       fid_rank_sort_cls_code: sortCode,
       fid_etc_cls_code: "2",
     }
@@ -299,7 +299,7 @@ async function getInstitutionRanking(
     changeRate: parseNumber(item.prdy_ctrt),
     changePrice: parseNumber(item.prdy_vrss),
     volume: parseNumber(item.acml_vol),
-    netBuyVolume: parseNumber(item.orgn_ntby_qty),
+    netBuyVolume: parseNumber(item.orgn_ntby_tr_pbmn),
   }));
 }
 
