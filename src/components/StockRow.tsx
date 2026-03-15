@@ -16,7 +16,7 @@ export default function StockRow({ stock, showNetBuy = false, netBuyLabel = "순
 
   return (
     <Link
-      href={`/stock/${stock.code}`}
+      href={`/stock/${stock.code}?name=${encodeURIComponent(stock.name)}`}
       className="flex items-center gap-3 px-4 py-3 hover:bg-card-hover transition-colors cursor-pointer border-b border-border last:border-b-0"
     >
       {/* 순위 */}

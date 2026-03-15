@@ -8,12 +8,14 @@ import { formatNumber, formatVolume, getChangeColor, getChangeSign } from "@/lib
 
 interface PageProps {
   params: Promise<{ code: string }>;
+  searchParams: Promise<{ name?: string }>;
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
   const { code } = await params;
+  const { name } = await searchParams;
   return {
-    title: `${code} 종목 상세 | KIS 주식시세`,
+    title: `${name ?? code} 종목 상세 | KIS 주식시세`,
   };
 }
 
@@ -22,8 +24,9 @@ function formatDate(d: string): string {
   return `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6, 8)}`;
 }
 
-export default async function StockDetailPage({ params }: PageProps) {
+export default async function StockDetailPage({ params, searchParams }: PageProps) {
   const { code } = await params;
+  const { name: nameParam } = await searchParams;
 
   if (!/^\d{6}$/.test(code)) {
     notFound();
@@ -41,6 +44,7 @@ export default async function StockDetailPage({ params }: PageProps) {
     notFound();
   }
 
+  const stockName = detail.name || nameParam || code;
   const isRise = detail.changeRate > 0;
   const isFall = detail.changeRate < 0;
   const badgeClass = isRise ? "bg-rise/10 text-rise" : isFall ? "bg-fall/10 text-fall" : "bg-border text-text-secondary";
@@ -62,7 +66,7 @@ export default async function StockDetailPage({ params }: PageProps) {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <h1 className="text-2xl font-bold text-text-primary">
-                {detail.name}
+                {stockName}
               </h1>
               <span className="text-text-muted text-sm bg-border px-2 py-0.5 rounded">
                 {code}
