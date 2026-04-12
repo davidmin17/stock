@@ -1,5 +1,6 @@
 export type Category =
   | "popular"
+  | "recommended"
   | "rising"
   | "falling"
   | "volume"
@@ -18,6 +19,10 @@ export interface StockRanking {
   volume: number;
   /** 외인/기관 순매수량 (해당 카테고리에서만 존재) */
   netBuyVolume?: number;
+  /** 외인 순매수 대금 (추천 카테고리) */
+  foreignBuyAmount?: number;
+  /** 기관 순매수 대금 (추천 카테고리) */
+  institutionBuyAmount?: number;
 }
 
 export interface StockDetail {

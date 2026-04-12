@@ -16,7 +16,11 @@
       "Bash(GIT_TERMINAL_PROMPT=0 git commit --no-gpg-sign -m \"upgrade ESLint 8 to 9 with flat config\" 2>&1; echo \"exit: $?\")",
       "Bash(git push:*)",
       "Bash(npm list:*)",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "Bash(grep \"\\\\[recommended\\\\]\" /Users/a201903062/workspace/stock/.next/server/*.log)",
+      "Bash(python3 -m json.tool)",
+      "Bash(grep -n \"useState\\\\|useRef\" /Users/a201903062/workspace/stock/src/components/*.tsx)",
+      "Bash(xargs basename:*)"
     ]
   }
 }

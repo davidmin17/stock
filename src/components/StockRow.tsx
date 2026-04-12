@@ -1,18 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import type { StockRanking } from "@/lib/types";
-import { formatNumber, formatVolume, getChangeColor, getChangeSign } from "@/lib/formatters";
+import type { StockRanking, Category } from "@/lib/types";
+import { formatNumber, formatVolume, formatAmount, getChangeColor, getChangeSign } from "@/lib/formatters";
 
 interface StockRowProps {
   stock: StockRanking;
+  category: Category;
   showNetBuy?: boolean;
   netBuyLabel?: string;
 }
 
-export default function StockRow({ stock, showNetBuy = false, netBuyLabel = "순매수" }: StockRowProps) {
+export default function StockRow({ stock, category, showNetBuy = false, netBuyLabel = "순매수" }: StockRowProps) {
   const changeColor = getChangeColor(stock.changeRate);
   const changeSign = getChangeSign(stock.changeRate);
+  const isRecommended = category === "recommended";
 
   return (
     <Link
@@ -51,25 +53,49 @@ export default function StockRow({ stock, showNetBuy = false, netBuyLabel = "순
         </p>
       </div>
 
-      {/* 거래량 또는 순매수 */}
-      <div className="text-right w-20 hidden sm:block">
-        {showNetBuy && stock.netBuyVolume !== undefined ? (
-          <>
-            <p className={`text-sm font-medium ${netBuyLabel.startsWith("순매도") ? "text-fall" : "text-rise"}`}>
-              {netBuyLabel.startsWith("순매수") && "+"}
-              {formatVolume(stock.netBuyVolume)}
+      {/* 추천: 외인 대금 / 기관 대금 / 합산 대금 */}
+      {isRecommended ? (
+        <>
+          <div className="text-right w-20 hidden sm:block">
+            <p className="text-sm font-medium text-rise">
+              {formatAmount(stock.foreignBuyAmount ?? 0)}
             </p>
-            <p className="text-text-muted text-xs">{netBuyLabel}</p>
-          </>
-        ) : (
-          <>
-            <p className="text-text-secondary text-sm">
-              {formatVolume(stock.volume)}
+            <p className="text-text-muted text-xs">외인</p>
+          </div>
+          <div className="text-right w-20 hidden sm:block">
+            <p className="text-sm font-medium text-rise">
+              {formatAmount(stock.institutionBuyAmount ?? 0)}
             </p>
-            <p className="text-text-muted text-xs">거래량</p>
-          </>
-        )}
-      </div>
+            <p className="text-text-muted text-xs">기관</p>
+          </div>
+          <div className="text-right w-20 hidden sm:block">
+            <p className="text-sm font-bold text-yellow-400">
+              {formatAmount(stock.netBuyVolume ?? 0)}
+            </p>
+            <p className="text-text-muted text-xs">합산</p>
+          </div>
+        </>
+      ) : (
+        /* 기존: 거래량 또는 순매수 */
+        <div className="text-right w-20 hidden sm:block">
+          {showNetBuy && stock.netBuyVolume !== undefined ? (
+            <>
+              <p className={`text-sm font-medium ${netBuyLabel.startsWith("순매도") ? "text-fall" : "text-rise"}`}>
+                {netBuyLabel.startsWith("순매수") && "+"}
+                {formatAmount(Math.abs(stock.netBuyVolume))}
+              </p>
+              <p className="text-text-muted text-xs">{netBuyLabel}</p>
+            </>
+          ) : (
+            <>
+              <p className="text-text-secondary text-sm">
+                {formatVolume(stock.volume)}
+              </p>
+              <p className="text-text-muted text-xs">거래량</p>
+            </>
+          )}
+        </div>
+      )}
     </Link>
   );
 }

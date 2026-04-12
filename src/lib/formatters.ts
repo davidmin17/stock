@@ -15,6 +15,13 @@ export function formatVolume(n: number): string {
   return n.toString();
 }
 
+/** 거래대금(백만원 단위)을 억 단위로 표기 (예: 453934 → "4,539억") */
+export function formatAmount(n: number): string {
+  const eok = n / 100;
+  if (Math.abs(eok) >= 10) return `${formatNumber(Math.round(eok))}억`;
+  return `${eok.toFixed(1)}억`;
+}
+
 /** 등락률에 따른 Tailwind 색상 클래스 반환 */
 export function getChangeColor(rate: number): string {
   if (rate > 0) return "text-rise";

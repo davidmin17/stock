@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { KISWebSocket, type RealtimeStockData } from "@/lib/kis-websocket";
 import { isMarketOpen } from "@/lib/market";
 import { formatNumber, getChangeColor, getChangeSign } from "@/lib/formatters";
@@ -23,7 +23,6 @@ export default function RealtimePrice({
   const [changePrice, setChangePrice] = useState(initialChangePrice);
   const [isRealtime, setIsRealtime] = useState(false);
   const [flash, setFlash] = useState<"up" | "down" | null>(null);
-  const wsRef = useRef<KISWebSocket | null>(null);
 
   useEffect(() => {
     if (!isMarketOpen()) return;
@@ -37,7 +36,6 @@ export default function RealtimePrice({
         if (!approvalKey) return;
 
         ws = new KISWebSocket(approvalKey);
-        wsRef.current = ws;
 
         ws.subscribe(code, (data: RealtimeStockData) => {
           setFlash(data.price > price ? "up" : "down");

@@ -263,18 +263,21 @@ async function getForeignRanking(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const output: any[] = data?.output ?? [];
   const isSell = sortCode === "1";
-  return output.slice(0, 20).map((item, idx) => ({
-    rank: idx + 1,
-    code: item.mksc_shrn_iscd ?? "",
-    name: item.hts_kor_isnm ?? "",
-    price: parseNumber(item.stck_prpr),
-    changeRate: parseNumber(item.prdy_ctrt),
-    changePrice: parseNumber(item.prdy_vrss),
-    volume: parseNumber(item.acml_vol),
-    netBuyVolume: isSell
-      ? -parseNumber(item.frgn_ntby_qty)
-      : parseNumber(item.frgn_ntby_qty),
-  }));
+  return output
+    .map((item) => ({
+      code: item.mksc_shrn_iscd ?? "",
+      name: item.hts_kor_isnm ?? "",
+      price: parseNumber(item.stck_prpr),
+      changeRate: parseNumber(item.prdy_ctrt),
+      changePrice: parseNumber(item.prdy_vrss),
+      volume: parseNumber(item.acml_vol),
+      netBuyVolume: isSell
+        ? -parseNumber(item.frgn_ntby_tr_pbmn)
+        : parseNumber(item.frgn_ntby_tr_pbmn),
+    }))
+    .sort((a, b) => Math.abs(b.netBuyVolume) - Math.abs(a.netBuyVolume))
+    .slice(0, 20)
+    .map((item, idx) => ({ ...item, rank: idx + 1 }));
 }
 
 // 기관 순매수/매도 순위
@@ -298,17 +301,98 @@ async function getInstitutionRanking(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const output: any[] = data?.output ?? [];
   const isSell = sortCode === "1";
-  return output.slice(0, 20).map((item, idx) => ({
+  return output
+    .map((item) => ({
+      code: item.mksc_shrn_iscd ?? "",
+      name: item.hts_kor_isnm ?? "",
+      price: parseNumber(item.stck_prpr),
+      changeRate: parseNumber(item.prdy_ctrt),
+      changePrice: parseNumber(item.prdy_vrss),
+      volume: parseNumber(item.acml_vol),
+      netBuyVolume: isSell
+        ? -parseNumber(item.orgn_ntby_tr_pbmn)
+        : parseNumber(item.orgn_ntby_tr_pbmn),
+    }))
+    .sort((a, b) => Math.abs(b.netBuyVolume) - Math.abs(a.netBuyVolume))
+    .slice(0, 20)
+    .map((item, idx) => ({ ...item, rank: idx + 1 }));
+}
+
+// 외인+기관 동시 매수 합산 순위 (추천)
+async function getRecommendedRanking(): Promise<StockRanking[]> {
+  const COMMON_PARAMS = {
+    fid_cond_mrkt_div_code: "V",
+    fid_cond_scr_div_code: "16449",
+    fid_input_iscd: "0000",
+    fid_div_cls_code: "1",
+    fid_rank_sort_cls_code: "0",
+  };
+
+  const [foreignData, institutionData] = await Promise.all([
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    kisGet<any>(
+      "/uapi/domestic-stock/v1/quotations/foreign-institution-total",
+      "FHPTJ04400000",
+      { ...COMMON_PARAMS, fid_etc_cls_code: "1" }
+    ),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    kisGet<any>(
+      "/uapi/domestic-stock/v1/quotations/foreign-institution-total",
+      "FHPTJ04400000",
+      { ...COMMON_PARAMS, fid_etc_cls_code: "2" }
+    ),
+  ]);
+
+  // 기관 매수 데이터 맵 구성
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const institutionMap = new Map<string, any>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const item of (institutionData?.output ?? []) as any[]) {
+    const code: string = item.mksc_shrn_iscd ?? "";
+    if (code) institutionMap.set(code, item);
+  }
+
+  // 외인·기관 모두 순매수인 종목만 추출 후 대금 합산 정렬
+  const combined: Array<{
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fitem: any;
+    frgnAmt: number;
+    orgnAmt: number;
+    totalAmt: number;
+  }> = [];
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const fitem of (foreignData?.output ?? []) as any[]) {
+    const code: string = fitem.mksc_shrn_iscd ?? "";
+    const iitem = institutionMap.get(code);
+    if (!iitem) continue;
+
+    const frgnQty = parseNumber(fitem.frgn_ntby_qty);
+    const orgnQty = parseNumber(iitem.orgn_ntby_qty);
+    if (frgnQty <= 0 || orgnQty <= 0) continue;
+
+    // 순매수 대금 (tr_pbmn 필드 우선, 없으면 qty로 폴백)
+    const frgnAmt =
+      parseNumber(fitem.frgn_ntby_tr_pbmn) || parseNumber(fitem.frgn_ntby_qty);
+    const orgnAmt =
+      parseNumber(iitem.orgn_ntby_tr_pbmn) || parseNumber(iitem.orgn_ntby_qty);
+
+    combined.push({ fitem, frgnAmt, orgnAmt, totalAmt: frgnAmt + orgnAmt });
+  }
+
+  combined.sort((a, b) => b.totalAmt - a.totalAmt);
+
+  return combined.slice(0, 20).map(({ fitem, frgnAmt, orgnAmt, totalAmt }, idx) => ({
     rank: idx + 1,
-    code: item.mksc_shrn_iscd ?? "",
-    name: item.hts_kor_isnm ?? "",
-    price: parseNumber(item.stck_prpr),
-    changeRate: parseNumber(item.prdy_ctrt),
-    changePrice: parseNumber(item.prdy_vrss),
-    volume: parseNumber(item.acml_vol),
-    netBuyVolume: isSell
-      ? -parseNumber(item.orgn_ntby_qty)
-      : parseNumber(item.orgn_ntby_qty),
+    code: fitem.mksc_shrn_iscd ?? "",
+    name: fitem.hts_kor_isnm ?? "",
+    price: parseNumber(fitem.stck_prpr),
+    changeRate: parseNumber(fitem.prdy_ctrt),
+    changePrice: parseNumber(fitem.prdy_vrss),
+    volume: parseNumber(fitem.acml_vol),
+    foreignBuyAmount: frgnAmt,
+    institutionBuyAmount: orgnAmt,
+    netBuyVolume: totalAmt,
   }));
 }
 
@@ -344,12 +428,13 @@ export async function getRankings(
   const ttl = rankingTTL();
   return withCache(`kis:rankings:${category}`, ttl, async () => {
     switch (category) {
-      case "popular":       return getPopularRanking();
-      case "rising":        return getFluctuationRanking("0");
-      case "falling":       return getFluctuationRanking("1");
-      case "volume":        return getVolumeRanking();
-      case "foreignBuy":    return getForeignRanking("0");
-      case "foreignSell":   return getForeignRanking("1");
+      case "popular":         return getPopularRanking();
+      case "recommended":     return getRecommendedRanking();
+      case "rising":          return getFluctuationRanking("0");
+      case "falling":         return getFluctuationRanking("1");
+      case "volume":          return getVolumeRanking();
+      case "foreignBuy":      return getForeignRanking("0");
+      case "foreignSell":     return getForeignRanking("1");
       case "institutionBuy":  return getInstitutionRanking("0");
       case "institutionSell": return getInstitutionRanking("1");
     }

@@ -9,6 +9,7 @@ interface TabConfig {
 
 const TABS: TabConfig[] = [
   { key: "popular", label: "인기" },
+  { key: "recommended", label: "추천" },
   { key: "rising", label: "상승률" },
   { key: "falling", label: "하락률" },
   { key: "volume", label: "거래량" },

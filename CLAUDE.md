@@ -26,7 +26,7 @@ src/
 │       ├── stock/[code]/route.ts   # 현재가 + 일별 시세
 │       └── realtime/route.ts       # WebSocket approval key 발급
 ├── components/
-│   ├── CategoryTabs.tsx            # 8개 카테고리 탭
+│   ├── CategoryTabs.tsx            # 9개 카테고리 탭
 │   ├── IndexBadges.tsx             # 코스피/코스닥 지수 배지 (SWR 30초 갱신)
 │   ├── RankingTable.tsx            # TOP 20 순위 테이블
 │   ├── StockRow.tsx                # 종목 행 컴포넌트
@@ -35,7 +35,7 @@ src/
 │   └── PriceChart.tsx              # 종가 흐름 SVG 차트 (최근 20일, 호버 툴팁)
 └── lib/
     ├── types.ts                    # TypeScript 타입 정의
-    ├── formatters.ts               # 공통 포맷 유틸리티 (formatNumber, formatVolume, getChangeColor 등)
+    ├── formatters.ts               # 공통 포맷 유틸리티 (formatNumber, formatVolume, formatAmount, getChangeColor 등)
     ├── kis-api.ts                  # KIS API 클라이언트 (모든 API에 withCache 적용)
     ├── kis-websocket.ts            # 브라우저용 WebSocket 클라이언트
     ├── cache.ts                    # 3계층 캐시 유틸리티 (메모리 / single-flight / Redis) + IP 기반 rate limiting + getClientIP
@@ -58,11 +58,12 @@ REDIS_URL=Redis_연결_URL   # 없으면 메모리 캐시만 사용
 
 ## 주요 기능
 
-### 카테고리 (8종)
+### 카테고리 (9종)
 
 | 카테고리 | category 값 | KIS TR ID | KIS API 경로 |
 |---------|------------|-----------|-------------|
 | 인기 | `popular` | `FHPST01800000` | `/ranking/top-interest-stock` (관심 종목 등록 건수) |
+| 추천 | `recommended` | `FHPTJ04400000` ×2 | 외인+기관 동시 매수 종목, 순매수 대금 합산 정렬 |
 | 상승률 | `rising` | `FHPST01700000` | `/ranking/fluctuation` (sort=0) |
 | 하락률 | `falling` | `FHPST01700000` | `/ranking/fluctuation` (sort=1) |
 | 거래량 | `volume` | `FHPST01710000` | `/quotations/volume-rank` |
@@ -72,6 +73,10 @@ REDIS_URL=Redis_연결_URL   # 없으면 메모리 캐시만 사용
 | 기관매도 | `institutionSell` | `FHPTJ04400000` | `/quotations/foreign-institution-total` (`fid_etc_cls_code=2`, sort=1) |
 
 > 외인/기관 4개 카테고리는 동일 엔드포인트를 공유하며 `fid_etc_cls_code`(1=외국인, 2=기관)와 `fid_rank_sort_cls_code`(0=매수, 1=매도)로 구분한다.
+
+> **추천 카테고리**: 외인 매수(`fid_etc_cls_code=1`)와 기관 매수(`fid_etc_cls_code=2`) API를 병렬 호출하여 교집합(둘 다 순매수 양수)을 구한 뒤, `frgn_ntby_tr_pbmn + orgn_ntby_tr_pbmn` 합산 대금 내림차순으로 TOP 20을 반환한다.
+
+> **외인/기관 대금 표시**: 4개 외인/기관 카테고리와 추천 카테고리는 `_tr_pbmn`(백만원 단위) 필드를 사용하여 순매수/순매도 대금을 억 단위로 표시한다. 클라이언트에서 `_tr_pbmn` 값 기준으로 재정렬한다.
 
 ### API 엔드포인트
 - `GET /api/rankings?category={category}` — 카테고리별 순위
@@ -113,7 +118,9 @@ Redis가 없거나 오류 시 `globalThis.__rlStore` 기반 **메모리 rate lim
 
 ### 메인 페이지
 - **코스피/코스닥 지수** (`IndexBadges.tsx`): 헤더 우측에 배지 형태로 표시, 30초마다 SWR 갱신
-- **카테고리 탭**: 8개 카테고리, 외인/기관 매수·매도는 순매수/순매도 수량(거래대금 기준 정렬) 표시
+- **카테고리 탭**: 9개 카테고리
+  - 외인/기관 매수·매도: 순매수/순매도 대금(억 단위) 표시, 대금순 정렬
+  - 추천: 외인 대금 + 기관 대금 + 합산 대금 3컬럼 표시
 
 ### 종목 상세 페이지
 - **종가 차트** (`PriceChart.tsx`): 순수 SVG, 외부 라이브러리 없음
@@ -135,6 +142,7 @@ Redis가 없거나 오류 시 `globalThis.__rlStore` 기반 **메모리 rate lim
 - 카드: `#1a1a1a` ~ `#1e1e1e`
 - 상승: `#ef4444` (빨간색, 한국 주식 관행)
 - 하락: `#3b82f6` (파란색)
+- 추천 합산 대금 강조: `text-yellow-400`
 - 기본 텍스트: `#f1f5f9`
 - 서브 텍스트: `#94a3b8`
 - 액센트(탭 활성): `#3b82f6`
@@ -158,7 +166,7 @@ npm run lint    # ESLint 검사
 | IP 추출 | `cache.ts` → `getClientIP()` | `x-real-ip` 우선, 없으면 `x-forwarded-for` 첫 번째 값 |
 | KIS API 에러 | `kis-api.ts` → `kisGet()` | 에러 응답 바디는 서버 로그에만 기록, 클라이언트에 미전달 |
 | WebSocket 메시지 | `kis-websocket.ts` | 수신 가격/거래량 범위 검증 (0~10,000,000원, 음수 차단) |
-| 토큰 보호 | API Route 서버 한정 | KIS 액세스 토큰은 서버 내부에서만 사용. `/api/token` 미노출 |
+| 토큰 보호 | API Route 서버 한정 | KIS 액세스 토큰은 서버 내부에서만 사용. 토큰 엔드포인트 미노출 |
 
 ### CSP 허용 출처
 - `connect-src`: `self`, `wss://ops.koreainvestment.com:21000`, `https://openapi.koreainvestment.com:9443`
@@ -177,16 +185,16 @@ npm run lint    # ESLint 검사
 ## 주의사항
 
 - 코스피+코스닥 전체 종목 대상 (`fid_input_iscd: "0000"`)
-- 카테고리별 TOP 20 표시 (`output.slice(0, 20)`)
+- 카테고리별 TOP 20 표시
 - KIS API 초당 요청 제한이 있으므로 캐싱 필수 유지
 - API 에러 응답에는 내부 상세 메시지를 포함하지 않는다. 상세 내용은 `console.error`로만 서버 로그에 남긴다
-- `/api/token` 엔드포인트는 보안상 제거됨. KIS 액세스 토큰은 서버 내부에서만 사용한다
 - Redis 클라이언트는 `lazyConnect` 없이 생성하며 `enableOfflineQueue`도 기본값(true)을 사용한다. Vercel 서버리스 cold start 시 커맨드가 큐에서 대기 후 정상 실행되도록 하기 위함
 - `MarketStatus.tsx`는 `new Date()` 기반으로 SSR/CSR hydration 불일치가 발생할 수 있어 초기 상태를 `null`로 두고 `useEffect`에서만 설정한다
 - `PriceChart.tsx`는 `"use client"` 컴포넌트이며 `dailyPrices`를 역순(오래된→최신)으로 정렬해서 렌더링한다. 정렬은 `useMemo`로 메모이제이션한다
 - L1 메모리 캐시와 single-flight Map은 `globalThis`에 저장한다. 모듈 레벨 변수로 선언하면 Next.js Hot Reload 시 재평가되어 캐시가 초기화되므로 주의
 - ESLint 9 flat config (`eslint.config.mjs`) 사용. `.eslintrc.*` 형식은 사용하지 않는다
-- 숫자 포맷 함수(`formatNumber`, `formatVolume`, `getChangeColor`, `getChangeSign`)는 `lib/formatters.ts`에서 import한다. 컴포넌트에 중복 구현하지 않는다
+- 숫자 포맷 함수(`formatNumber`, `formatVolume`, `formatAmount`, `getChangeColor`, `getChangeSign`)는 `lib/formatters.ts`에서 import한다. 컴포넌트에 중복 구현하지 않는다
 - `toLocaleString("ko-KR")`은 Node.js 서버 환경에서 ICU 데이터가 없으면 SSR/CSR hydration 불일치를 일으킨다. `formatNumber`의 정규식 방식을 사용한다
-- 외인/기관 매수 카테고리: `fid_div_cls_code=1`(거래대금) 기준 정렬, 표시값은 `frgn/orgn_ntby_qty`(순매수 수량). 매도 카테고리: 동일 정렬, 표시값은 부호 반전한 수량(양수로 표시)
+- 외인/기관 카테고리: `frgn_ntby_tr_pbmn` / `orgn_ntby_tr_pbmn`(백만원 단위 순매수 대금)을 사용하며, 클라이언트에서 대금 절대값 내림차순으로 재정렬한다. `formatAmount`로 억 단위 변환하여 표시한다
+- 추천 카테고리: `foreignBuyAmount`(외인 대금), `institutionBuyAmount`(기관 대금), `netBuyVolume`(합산 대금) 3개 필드를 반환한다. 모두 `_tr_pbmn` 백만원 단위 원본값이다
 - 보안 헤더는 `next.config.ts`의 `headers()` 함수에서 관리한다. CSP의 `connect-src`에 KIS WebSocket/REST 주소가 명시되어 있으므로 엔드포인트 변경 시 함께 수정해야 한다

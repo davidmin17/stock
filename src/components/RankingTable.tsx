@@ -25,9 +25,16 @@ export default function RankingTable({
   isLoading,
   error,
 }: RankingTableProps) {
+  const isRecommended = category === "recommended";
   const showNetBuy = NET_BUY_CATEGORIES.includes(category);
   const isSell = NET_SELL_CATEGORIES.includes(category);
-  const netBuyLabel = isSell ? "순매도 수량" : "순매수 수량";
+  const netBuyLabel = isSell ? "순매도 대금" : "순매수 대금";
+
+  const lastColHeader = isRecommended
+    ? null
+    : showNetBuy
+    ? netBuyLabel
+    : "거래량";
 
   if (isLoading) {
     return (
@@ -38,9 +45,17 @@ export default function RankingTable({
           <span className="flex-1 text-xs text-text-muted">종목명</span>
           <span className="w-24 text-right text-xs text-text-muted">현재가</span>
           <span className="w-16 text-right text-xs text-text-muted">등락률</span>
-          <span className="w-20 text-right text-xs text-text-muted hidden sm:block">
-            {showNetBuy ? netBuyLabel : "거래량"}
-          </span>
+          {isRecommended ? (
+            <>
+              <span className="w-20 text-right text-xs text-text-muted hidden sm:block">외인 대금</span>
+              <span className="w-20 text-right text-xs text-text-muted hidden sm:block">기관 대금</span>
+              <span className="w-20 text-right text-xs text-text-muted hidden sm:block">합산 대금</span>
+            </>
+          ) : (
+            <span className="w-20 text-right text-xs text-text-muted hidden sm:block">
+              {lastColHeader}
+            </span>
+          )}
         </div>
         {Array.from({ length: 10 }).map((_, i) => (
           <div
@@ -59,9 +74,17 @@ export default function RankingTable({
             <div className="w-16">
               <div className="h-4 bg-border rounded w-full" />
             </div>
-            <div className="w-20 hidden sm:block">
-              <div className="h-4 bg-border rounded w-full" />
-            </div>
+            {isRecommended ? (
+              <>
+                <div className="w-20 hidden sm:block"><div className="h-4 bg-border rounded w-full" /></div>
+                <div className="w-20 hidden sm:block"><div className="h-4 bg-border rounded w-full" /></div>
+                <div className="w-20 hidden sm:block"><div className="h-4 bg-border rounded w-full" /></div>
+              </>
+            ) : (
+              <div className="w-20 hidden sm:block">
+                <div className="h-4 bg-border rounded w-full" />
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -93,12 +116,26 @@ export default function RankingTable({
         <span className="flex-1 text-xs text-text-muted">종목명</span>
         <span className="w-24 text-right text-xs text-text-muted">현재가</span>
         <span className="w-16 text-right text-xs text-text-muted">등락률</span>
-        <span className="w-20 text-right text-xs text-text-muted hidden sm:block">
-          {showNetBuy ? netBuyLabel : "거래량"}
-        </span>
+        {isRecommended ? (
+          <>
+            <span className="w-20 text-right text-xs text-text-muted hidden sm:block">외인 대금</span>
+            <span className="w-20 text-right text-xs text-text-muted hidden sm:block">기관 대금</span>
+            <span className="w-20 text-right text-xs text-text-muted hidden sm:block">합산 대금</span>
+          </>
+        ) : (
+          <span className="w-20 text-right text-xs text-text-muted hidden sm:block">
+            {lastColHeader}
+          </span>
+        )}
       </div>
       {stocks.map((stock) => (
-        <StockRow key={stock.code} stock={stock} showNetBuy={showNetBuy} netBuyLabel={netBuyLabel} />
+        <StockRow
+          key={stock.code}
+          stock={stock}
+          category={category}
+          showNetBuy={showNetBuy}
+          netBuyLabel={netBuyLabel}
+        />
       ))}
     </div>
   );

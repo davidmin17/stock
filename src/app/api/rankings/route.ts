@@ -5,6 +5,7 @@ import type { Category } from "@/lib/types";
 
 const VALID_CATEGORIES: Category[] = [
   "popular",
+  "recommended",
   "rising",
   "falling",
   "volume",
